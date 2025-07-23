@@ -19,7 +19,7 @@ def download_census_puma_data(year=2020, output_dir="../data"):
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
     
-    API_KEY = "910f75dea9028e117b2d3c64a50078aa5161f965"
+    API_KEY = ""
     c = Census(API_KEY)
     
     # Variables: Median Household Income & Median Earnings
