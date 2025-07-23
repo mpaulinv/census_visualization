@@ -12,10 +12,10 @@ def load_optimized_boundaries(file_path=None):
     
     # Try standard optimized file first (better quality, moderate size)
     if file_path is None:
-        if os.path.exists("data/puma_boundaries_combined.gpkg"):
-            file_path = "data/puma_boundaries_combined.gpkg"
+        if os.path.exists("data/puma_boundaries_moderate.gpkg"):
+            file_path = "data/puma_boundaries_moderate.gpkg"
         else:
-            file_path = "data/puma_boundaries_combined.gpkg"
+            file_path = "data/puma_boundaries_moderate.gpkg"
     
     # Try to load standard optimized file first
     if os.path.exists(file_path):
@@ -168,7 +168,11 @@ def prepare_map_data(boundaries, census_data, data_column):
     map_data['state_name'] = map_data['STATEFP10'].map(state_names).fillna('Unknown State')
     
     # Clean up PUMA names for better display
-    map_data['clean_puma_name'] = map_data['NAMELSAD10'].str.replace(r'--PUMA \d+', '', regex=True).str.strip()
+    # Remove '--PUMA <digits>' and trailing 'PUMA' (with or without space before)
+    map_data['clean_puma_name'] = map_data['NAMELSAD10']
+    map_data['clean_puma_name'] = map_data['clean_puma_name'].str.replace(r'--PUMA \d+', '', regex=True)
+    map_data['clean_puma_name'] = map_data['clean_puma_name'].str.replace(r'\s*PUMA$', '', regex=True)
+    map_data['clean_puma_name'] = map_data['clean_puma_name'].str.strip()
     
     # Ensure all data is properly formatted for tooltip
     map_data[data_column] = pd.to_numeric(map_data[data_column], errors='coerce').fillna(0)
@@ -178,15 +182,15 @@ def prepare_map_data(boundaries, census_data, data_column):
     if len(map_data) > 0:
         min_val = map_data[data_column].min()
         max_val = map_data[data_column].max()
-        
         # Normalize values to 0-1 for color mapping
         normalized = (map_data[data_column] - min_val) / (max_val - min_val)
-        
-        # Create monotone blue scale: light blue to dark blue
-        map_data['red'] = (255 * (1 - normalized * 0.8)).astype(int)    # Light to darker
-        map_data['green'] = (255 * (1 - normalized * 0.6)).astype(int)  # Light to darker  
-        map_data['blue'] = 255                                          # Always blue
-        map_data['alpha'] = (120 + normalized * 100).astype(int)        # Semi-transparent to more opaque
+        # White to orange gradient for professional appearance
+        # Low values: Almost white (#FEFEFE)
+        # High values: Deep orange (#D97706)
+        map_data['red'] = (254 - normalized * 37).astype(int)     # 254 to 217
+        map_data['green'] = (254 - normalized * 135).astype(int)  # 254 to 119  
+        map_data['blue'] = (254 - normalized * 248).astype(int)   # 254 to 6
+        map_data['alpha'] = (180 + normalized * 75).astype(int)   # 180 to 255 for subtle transparency
     
     return map_data
 
@@ -276,12 +280,10 @@ def create_legend(map_data, data_column):
     for i in range(5):
         value = min_val + (max_val - min_val) * i / 4
         normalized = i / 4
-        
-        # Calculate color using same logic as map
-        red = int(255 * (1 - normalized * 0.8))
-        green = int(255 * (1 - normalized * 0.6))
-        blue = 255
-        
+        # White to orange gradient
+        red = int(254 - normalized * 37)
+        green = int(254 - normalized * 135)
+        blue = int(254 - normalized * 248)
         legend_steps.append({
             'value': value,
             'color': f'rgb({red}, {green}, {blue})',
@@ -327,26 +329,38 @@ def display_statistics(map_data, data_column, year):
             f"${min_value:,.0f}"
         )
 
-def display_top_areas(map_data, data_column, n=10):
+def display_top_and_bottom_areas(map_data, data_column, n=5):
     """
-    Display top performing areas
+    Display top 5 and bottom 5 performing areas
     """
     if map_data is None or len(map_data) == 0:
         return
     
-    st.subheader(f"Top {n} PUMAs by {data_column.replace('_', ' ').title()}")
-    
-    top_areas = map_data.nlargest(n, data_column)[
-        ['NAMELSAD10', 'STATEFP10', data_column]
-    ].reset_index(drop=True)
-    
-    # Format the data column as currency
+    # Get top 5 areas
+    top_areas = map_data.nlargest(n, data_column)[['clean_puma_name', 'STATEFP10', data_column]].reset_index(drop=True)
+    # Get bottom 5 areas
+    bottom_areas = map_data.nsmallest(n, data_column)[['clean_puma_name', 'STATEFP10', data_column]].reset_index(drop=True)
+    # Format the data columns as currency
     top_areas[f'{data_column}_formatted'] = top_areas[data_column].apply(lambda x: f"${x:,.0f}")
-    
-    # Display as a clean table
+    bottom_areas[f'{data_column}_formatted'] = bottom_areas[data_column].apply(lambda x: f"${x:,.0f}")
+    # Display top areas
+    st.markdown("#### Highest Values")
     st.dataframe(
-        top_areas[['NAMELSAD10', 'STATEFP10', f'{data_column}_formatted']].rename(columns={
-            'NAMELSAD10': 'PUMA Name',
+        top_areas[['clean_puma_name', 'STATEFP10', f'{data_column}_formatted']].rename(columns={
+            'clean_puma_name': 'Area',
+            'STATEFP10': 'State',
+            f'{data_column}_formatted': data_column.replace('_', ' ').title()
+        }),
+        use_container_width=True,
+        hide_index=True
+    )
+    # Add minimal spacing
+    st.markdown("<div style='margin: 1.5rem 0;'></div>", unsafe_allow_html=True)
+    # Display bottom areas
+    st.markdown("#### Lowest Values")
+    st.dataframe(
+        bottom_areas[['clean_puma_name', 'STATEFP10', f'{data_column}_formatted']].rename(columns={
+            'clean_puma_name': 'Area',
             'STATEFP10': 'State',
             f'{data_column}_formatted': data_column.replace('_', ' ').title()
         }),
@@ -358,33 +372,31 @@ def main():
     """
     Main Streamlit app
     """
-    st.title("🗺️ US Census Economic Data Explorer")
-    st.markdown("Interactive exploration of median household income and earnings across US Public Use Microdata Areas (PUMAs)")
+    st.markdown("<h1 class='address-title'>US Census Economic Data Explorer</h1>", unsafe_allow_html=True)
+    st.markdown("<div class='address-subtitle'>Interactive exploration of median household income and earnings across US Public Use Microdata Areas (PUMAs)</div>", unsafe_allow_html=True)
     
     # Sidebar controls
-    st.sidebar.header("Map Controls")
+    st.sidebar.markdown("<h2 class='address-sidebar-header'>Map Controls</h2>", unsafe_allow_html=True)
     
     # Year selection - check for available data files
     available_years = []
-    
-    # Check for year-specific files
     for year in [2022, 2021, 2020, 2019, 2018, 2017, 2016]:
         if os.path.exists(f"data/census_puma_data_{year}.csv"):
             available_years.append(year)
-    
-    # If no year-specific files, check for generic file
     if not available_years and os.path.exists("data/census_puma_data.csv"):
-        available_years = [2020]  # Default to 2020 for generic file
-    
+        available_years = [2020]
     if not available_years:
         st.error("❌ No census data files found. Please run download_census_data.py first.")
         st.stop()
-    
-    selected_year = st.sidebar.selectbox(
-        "Select Year",
-        available_years,
-        index=0,
-        help="Choose the census data year to display"
+    # Replace selectbox with slider and arrow icon
+    st.sidebar.markdown("<div class='address-sidebar-label'>Select Year</div>", unsafe_allow_html=True)
+    selected_year = st.sidebar.slider(
+        "Year",
+        min_value=min(available_years),
+        max_value=max(available_years),
+        value=max(available_years),
+        step=1,
+        format="%d"
     )
     
     # Data type selection
@@ -437,11 +449,11 @@ def main():
         st.stop()
     
     # Display statistics
-    st.subheader(f"📊 {data_options[selected_data]} Statistics for {selected_year}")
+    st.markdown(f"<h2 class='address-section-header'>{data_options[selected_data]} Statistics for {selected_year}</h2>", unsafe_allow_html=True)
     display_statistics(map_data, selected_data, selected_year)
     
     # Create and display map with legend
-    st.subheader(f"🗺️ {data_options[selected_data]} by PUMA - {selected_year}")
+    st.markdown(f"<h2 class='address-section-header'>{data_options[selected_data]} by PUMA - {selected_year}</h2>", unsafe_allow_html=True)
     
     # Create columns for map and legend
     map_col, legend_col = st.columns([4, 1])
@@ -453,65 +465,184 @@ def main():
             st.pydeck_chart(deck, use_container_width=True, height=600)
     
     with legend_col:
-        st.markdown("**Legend**")
+        st.markdown("<div class='address-legend-label'>Legend</div>", unsafe_allow_html=True)
         legend_data = create_legend(map_data, selected_data)
         if legend_data:
-            for step in reversed(legend_data):  # Show highest values at top
-                st.markdown(
-                    f'<div style="display: flex; align-items: center; margin: 5px 0;">'
-                    f'<div style="width: 20px; height: 20px; background-color: {step["color"]}; '
-                    f'border: 1px solid #ccc; margin-right: 8px;"></div>'
-                    f'<span style="font-size: 12px;">{step["label"]}</span>'
-                    f'</div>',
-                    unsafe_allow_html=True
-                )
-        
-        # Add color explanation
-        st.markdown(
-            '<div style="font-size: 11px; color: #666; margin-top: 10px;">'
-            'Light blue = Lower values<br/>'
-            'Dark blue = Higher values'
-            '</div>',
-            unsafe_allow_html=True
-        )
+            # Horizontal legend bar
+            legend_html = "<div class='address-legend-bar'>"
+            for step in legend_data:
+                legend_html += f"<div class='address-legend-step' style='background:{step['color']}'></div>"
+            legend_html += "</div>"
+            # Labels below
+            label_html = "<div class='address-legend-labels'>"
+            for step in legend_data:
+                label_html += f"<span>{step['label']}</span>"
+            label_html += "</div>"
+            st.markdown(legend_html + label_html, unsafe_allow_html=True)
     
     # Add map instructions
-    st.info("💡 **Map Tips:** Hover over areas to see state, PUMA name, and values. Use mouse/touch to zoom and pan.")
+    st.markdown("<div class='address-map-tips'>Map Tips: Hover over areas to see state, PUMA name, and values. Use mouse/touch to zoom and pan.</div>", unsafe_allow_html=True)
     
-    # Display top areas
+    # Display top and bottom areas
     col1, col2 = st.columns(2)
     
     with col1:
-        display_top_areas(map_data, selected_data, 10)
+        display_top_and_bottom_areas(map_data, selected_data, 5)
     
     with col2:
-        st.subheader("📈 Data Summary")
-        st.write(f"**Year:** {selected_year}")
-        st.write(f"**Data Type:** {data_options[selected_data]}")
-        st.write(f"**PUMAs with Data:** {len(map_data):,}")
-        
-        # Only calculate coverage if boundaries loaded successfully
+        st.markdown("<h3 class='address-section-header'>Data Summary</h3>", unsafe_allow_html=True)
+        st.markdown(f"<div class='address-summary'><strong>Year:</strong> {selected_year}<br><strong>Data Type:</strong> {data_options[selected_data]}<br><strong>PUMAs with Data:</strong> {len(map_data):,}</div>", unsafe_allow_html=True)
         if boundaries is not None:
-            st.write(f"**Coverage:** {len(map_data) / len(boundaries) * 100:.1f}% of all PUMAs")
+            st.markdown(f"<div class='address-summary'><strong>Coverage:</strong> {len(map_data) / len(boundaries) * 100:.1f}% of all PUMAs</div>", unsafe_allow_html=True)
         else:
-            st.write("**Coverage:** Unable to calculate (boundaries not loaded)")
-        
-        # Data source info
-        st.markdown("---")
-        st.markdown("**Data Sources:**")
-        st.markdown("- 📊 Census Bureau ACS 5-Year Estimates")
-        st.markdown("- 🗺️ TIGER/Line PUMA Boundaries (2020)")
-        st.markdown("- 🔧 Real-time Census API integration")
-        st.markdown("- ⚡ Ultra-optimized geometries (98.8% size reduction)")
-        
-        # Performance info
+            st.markdown("<div class='address-summary'><strong>Coverage:</strong> Unable to calculate (boundaries not loaded)</div>", unsafe_allow_html=True)
+        st.markdown("<hr>", unsafe_allow_html=True)
+        st.markdown("<div class='address-summary'><strong>Data Sources:</strong><ul><li>Census Bureau ACS 5-Year Estimates</li><li>TIGER/Line PUMA Boundaries (2020)</li><li>Real-time Census API integration</li><li>Ultra-optimized geometries (98.8% size reduction)</li></ul></div>", unsafe_allow_html=True)
         optimized_path = "data/puma_boundaries_optimized.gpkg"
         if os.path.exists(optimized_path):
             file_size = os.path.getsize(optimized_path) / 1024**2
-            st.markdown(f"- 🚀 Boundary file: {file_size:.1f}MB (ultra-optimized)")
-        
+            st.markdown(f"<div class='address-summary'>Boundary file: {file_size:.1f}MB (ultra-optimized)</div>", unsafe_allow_html=True)
         if use_high_detail:
-            st.info("🎯 High Detail Mode: Maximum visual quality enabled")
+            st.markdown("<div class='address-summary'>High Detail Mode: Maximum visual quality enabled</div>", unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
+
+
+st.markdown("""
+<style>
+    body, .main, .stApp {
+        background: #fff;
+        font-family: 'Montserrat', 'Helvetica Neue', Arial, sans-serif;
+        color: #222;
+    }
+    .address-title {
+        font-family: 'Montserrat', 'Helvetica Neue', Arial, sans-serif;
+        font-size: 2.8rem;
+        font-weight: 700;
+        letter-spacing: 1px;
+        color: #222;
+        margin-bottom: 0.5rem;
+    }
+    .address-subtitle {
+        font-size: 1.2rem;
+        color: #555;
+        margin-bottom: 2rem;
+        font-weight: 400;
+    }
+    .address-sidebar-header {
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: #222;
+        margin-bottom: 1.2rem;
+        letter-spacing: 0.5px;
+    }
+    .address-sidebar-label {
+        font-size: 1rem;
+        color: #222;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+    .address-section-header {
+        font-size: 1.4rem;
+        font-weight: 700;
+        color: #222;
+        margin-top: 2rem;
+        margin-bottom: 1rem;
+        letter-spacing: 0.5px;
+    }
+    .address-legend-label {
+        font-size: 1rem;
+        font-weight: 600;
+        color: #222;
+        margin-bottom: 0.5rem;
+    }
+    .address-legend-bar {
+        display: flex;
+        height: 18px;
+        border-radius: 9px;
+        overflow: hidden;
+        margin-bottom: 0.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+        border: 1px solid #eee;
+    }
+    .address-legend-step {
+        flex: 1;
+        height: 100%;
+    }
+    .address-legend-labels {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.95rem;
+        color: #555;
+        margin-bottom: 1rem;
+    }
+    .address-map-tips {
+        background: #f7f7f7;
+        color: #222;
+        font-size: 1rem;
+        border-radius: 8px;
+        padding: 0.8rem 1.2rem;
+        margin: 1.5rem 0;
+        border: 1px solid #eee;
+        font-weight: 500;
+    }
+    .address-summary {
+        font-size: 1rem;
+        color: #222;
+        margin-bottom: 0.7rem;
+        font-weight: 400;
+    }
+    .stDataFrame {
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+        background-color: #fff;
+        font-family: 'Montserrat', 'Helvetica Neue', Arial, sans-serif;
+        font-size: 1rem;
+    }
+    .stDataFrame table {
+        font-weight: 600;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+    .stDataFrame th {
+        background: #fffbe6;
+        color: #222;
+        font-weight: 700;
+        font-size: 1.05rem;
+        border-bottom: 2px solid #f7c948;
+    }
+    .stDataFrame td {
+        background: #fff;
+        color: #222;
+        font-weight: 500;
+        border-bottom: 1px solid #f0f0f0;
+    }
+    .stDataFrame tr:nth-child(even) td {
+        background: #f7f7f7;
+    }
+    .stSidebar {
+        background-color: #fff;
+        border-right: 1px solid #e2e8f0;
+    }
+    .stSelectbox > div > div {
+        background-color: #fff;
+        border: 1px solid #e2e8f0;
+    }
+    .stSlider > div > div > div {
+        color: #f7c948;
+    }
+    .map-container {
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        border: 1px solid #e2e8f0;
+    }
+    .stAlert > div {
+        background-color: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        color: #4a5568;
+    }
+</style>
+""", unsafe_allow_html=True)
