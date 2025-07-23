@@ -25,7 +25,7 @@ def download_census_puma_data(year=2020, output_dir=None):
     os.makedirs(output_dir, exist_ok=True)
     print(f"📁 Output directory: {output_dir}")
     
-    API_KEY = "910f75dea9028e117b2d3c64a50078aa5161f965"
+    API_KEY = ""
     c = Census(API_KEY)
     
     # Variables: Median Household Income & Median Earnings
