@@ -2,7 +2,7 @@ from census import Census
 import pandas as pd
 import os
 
-def download_census_puma_data(year=2020, output_dir="../data"):
+def download_census_puma_data(year=2020, output_dir=None):
     """
     Download census data for all PUMAs for a specific year
     
@@ -13,13 +13,19 @@ def download_census_puma_data(year=2020, output_dir="../data"):
     Returns:
         pd.DataFrame: Census data for the specified year
     """
-    print(f"📊 Downloading Census Data for All PUMAs - Year {year}")
+    print(f"Downloading Census Data for All PUMAs - Year {year}")
     print("="*50)
+    
+    # Determine output directory - work from script location
+    if output_dir is None:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        output_dir = os.path.join(os.path.dirname(script_dir), "data")
     
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
+    print(f"📁 Output directory: {output_dir}")
     
-    API_KEY = ""
+    API_KEY = "910f75dea9028e117b2d3c64a50078aa5161f965"
     c = Census(API_KEY)
     
     # Variables: Median Household Income & Median Earnings
@@ -64,7 +70,7 @@ def download_census_puma_data(year=2020, output_dir="../data"):
         print(f"Columns: {list(df.columns)}")
         print(f"Shape: {df.shape}")
         
-        print(f"\n📊 Sample Data for {year}:")
+        print(f"\nSample Data for {year}:")
         print(df[['NAME', 'year', 'state_fips', 'puma_code', 'median_household_income', 'median_earnings']].head(10))
         
         print(f"\n🔍 Data Quality Check for {year}:")
@@ -94,7 +100,7 @@ def download_census_puma_data(year=2020, output_dir="../data"):
         print(f"  - Year {year} not available in ACS 5-year estimates")
         return None
 
-def download_multiple_years(years=[2020, 2019, 2018], output_dir="../data"):
+def download_multiple_years(years=[2020, 2019, 2018], output_dir=None):
     """
     Download census data for multiple years
     
@@ -105,8 +111,13 @@ def download_multiple_years(years=[2020, 2019, 2018], output_dir="../data"):
     Returns:
         dict: Dictionary with year as key and DataFrame as value
     """
-    print(f"📊 Downloading Census Data for Multiple Years: {years}")
+    print(f"Downloading Census Data for Multiple Years: {years}")
     print("="*60)
+    
+    # Determine output directory if not provided
+    if output_dir is None:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        output_dir = os.path.join(os.path.dirname(script_dir), "data")
     
     all_data = {}
     successful_downloads = []
@@ -132,16 +143,23 @@ def download_multiple_years(years=[2020, 2019, 2018], output_dir="../data"):
     return all_data
 
 if __name__ == "__main__":
-    # Example usage - download data for multiple years
-    years_to_download = [2020, 2019, 2018]
+    # Download data for multiple years (2017-2022)
+    years_to_download = [2022, 2021, 2020, 2019, 2018, 2017]
     
-    print("🚀 Starting multi-year census data download...")
+    print("🚀 Starting comprehensive multi-year census data download...")
+    print(f"📅 Target years: {years_to_download}")
+    
     all_data = download_multiple_years(years=years_to_download)
     
     if all_data:
         print(f"\n🎉 Successfully downloaded census data for {len(all_data)} years!")
         for year, data in all_data.items():
             print(f"  📁 Year {year}: {len(data)} PUMAs saved to data/census_puma_data_{year}.csv")
-        print("\n🗺️ Ready to build interactive map!")
+        print("\n� Data Summary:")
+        print(f"   - Years available: {sorted(all_data.keys())}")
+        print(f"   - Total datasets: {len(all_data)}")
+        print(f"   - PUMA coverage: ~{len(next(iter(all_data.values())))} areas per year")
+        print("\n�🗺️ Ready to build multi-year interactive map!")
     else:
         print("\n❌ No census data was successfully downloaded.")
+        print("💡 Try checking your internet connection and Census API status.")
