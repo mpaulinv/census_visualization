@@ -166,6 +166,29 @@ def get_theme_css(is_dark):
             border-color: var(--accent) !important;
             color: var(--accent) !important;
         }
+        
+        /* Mobile Responsive Styles */
+        @media (max-width: 768px) {
+            .top-nav { flex-direction: column !important; padding: 12px 16px !important; gap: 8px !important; }
+            .nav-brand { text-align: center !important; }
+            .nav-title { font-size: 16px !important; }
+            .nav-subtitle { font-size: 10px !important; display: none !important; }
+            .nav-links { display: none !important; }
+            [data-testid="column"] { width: 100% !important; flex: 1 1 100% !important; padding: 0 4px !important; }
+            .stat-card { padding: 12px !important; margin-bottom: 8px !important; }
+            .stat-value { font-size: 18px !important; }
+            .stat-label { font-size: 9px !important; }
+            .panel-label { font-size: 9px !important; margin-bottom: 6px !important; }
+            [data-testid="stHorizontalBlock"] { flex-direction: column !important; }
+            iframe { min-height: 400px !important; }
+            .stButton > button { padding: 8px 12px !important; font-size: 11px !important; width: 100% !important; }
+            .js-plotly-plot { width: 100% !important; }
+        }
+        @media (max-width: 480px) {
+            .nav-title { font-size: 14px !important; }
+            .stat-value { font-size: 16px !important; }
+            iframe { min-height: 350px !important; }
+        }
         </style>
         """
     else:
@@ -298,6 +321,29 @@ def get_theme_css(is_dark):
         .stButton > button:hover {
             border-color: var(--accent) !important;
             color: var(--accent) !important;
+        }
+        
+        /* Mobile Responsive Styles */
+        @media (max-width: 768px) {
+            .top-nav { flex-direction: column !important; padding: 12px 16px !important; gap: 8px !important; }
+            .nav-brand { text-align: center !important; }
+            .nav-title { font-size: 16px !important; }
+            .nav-subtitle { font-size: 10px !important; display: none !important; }
+            .nav-links { display: none !important; }
+            [data-testid="column"] { width: 100% !important; flex: 1 1 100% !important; padding: 0 4px !important; }
+            .stat-card { padding: 12px !important; margin-bottom: 8px !important; }
+            .stat-value { font-size: 18px !important; }
+            .stat-label { font-size: 9px !important; }
+            .panel-label { font-size: 9px !important; margin-bottom: 6px !important; }
+            [data-testid="stHorizontalBlock"] { flex-direction: column !important; }
+            iframe { min-height: 400px !important; }
+            .stButton > button { padding: 8px 12px !important; font-size: 11px !important; width: 100% !important; }
+            .js-plotly-plot { width: 100% !important; }
+        }
+        @media (max-width: 480px) {
+            .nav-title { font-size: 14px !important; }
+            .stat-value { font-size: 16px !important; }
+            iframe { min-height: 350px !important; }
         }
         </style>
         """
