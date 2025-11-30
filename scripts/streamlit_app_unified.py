@@ -612,12 +612,12 @@ def main():
         </div>
     ''', unsafe_allow_html=True)
     
-    # Find years
+    # Find years - use BASE_DIR for proper path resolution
     years = sorted([y for y in [2022, 2021, 2020, 2019, 2018, 2017] 
-                   if os.path.exists(f"data/census_puma_data_{y}.parquet") or 
-                      os.path.exists(f"data/census_puma_data_{y}.csv")], reverse=True)
+                   if (BASE_DIR / f"data/census_puma_data_{y}.parquet").exists() or 
+                      (BASE_DIR / f"data/census_puma_data_{y}.csv").exists()], reverse=True)
     if not years:
-        years = [2020] if os.path.exists("data/census_puma_data.csv") else []
+        years = [2020] if (BASE_DIR / "data/census_puma_data.csv").exists() else []
     if not years:
         st.error("No census data files found")
         st.stop()
